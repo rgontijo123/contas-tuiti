@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Controlador de Orçamento Mensal</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        input, select {
+            margin: 10px 0;
+            padding: 10px;
+            width: 200px;
+        }
+        button {
+            padding: 5px 10px;
+            margin: 0 5px;
+        }
+        table {
+            margin-top: 20px;
+            border-collapse: collapse;
+            width: 100%;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        .positive {
+            color: green;
+            font-weight: bold;
+        }
+        .negative {
+            color: red;
+            font-weight: bold;
+        }
+        .controls {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+        }
+        .export-section {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #f0f8ff;
+            border-radius: 5px;
+        }
+        .cloud-section {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #e6f7ff;
+            border-radius: 5px;
+            border: 1px solid #b3e0ff;
+        }
+        #emailTo, #bucketName, #fileName {
+            width: 300px;
+        }
+        .success-message {
+            color: green;
+            font-weight: bold;
+            margin-top: 10px;
+            display: none;
+        }
+        .error-message {
+            color: red;
+            font-weight: bold;
+            margin-top: 10px;
+            display: none;
+        }
+        .cloud-result {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+            display: none;
+        }
+        #publicLink {
+            word-break: break-all;
+            color: blue;
+            text-decoration: underline;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h1>Controlador de Orçamento Mensal</h1>
+    
+    <div class="controls">
+        <h3>Selecione o Mês</h3>
+        <select id="monthSelector" onchange="changeMonth()">
+            <option value="Janeiro">Janeiro</option>
+            <option value="Fevereiro">Fevereiro</option>
+            <option value="Março">Março</option>
+            <option value="Abril">Abril</option>
+            <option value="Maio">Maio</option>
+            <option value="Junho">Junho</option>
+            <option value="Julho">Julho</option>
+            <option value="Agosto">Agosto</option>
+            <option value="Setembro">Setembro</option>
+            <option value="Outubro">Outubro</option>
+            <option value="Novembro">Novembro</option>
+            <option value="Dezembro">Dezembro</option>
+        </select>
+        <span id="currentYear"></span>
+    </div>
+    
+    <h2>Renda</h2>
+    <input type="text" id="incomeCategory" placeholder="Categoria de Renda" />
+    <input type="number" id="incomeAmount" placeholder="Insira a Renda" />
+    <button onclick="addIncome()">Adicionar Renda</button>
+    
+    <table>
+        <thead>
+            <tr>
+                <th>Categoria</th>
+                <th>Valor</th>
+                <th>Ações</th>
+            </tr>
+        </thead>
+        <tbody id="incomeList">
+        </tbody>
+    </table>
+    
+    <h2>Despesas</h2>
+    <input type="text" id="expenseCategory" placeholder="Categoria de Despesa" />
+    <input type="number" id="expenseAmount" placeholder="Insira o Valor da Despesa" />
+    <button onclick="addExpense()">Adicionar Despesa</button>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Categoria</th>
+                <th>Valor</th>
+                <th>Ações</th>
+            </tr>
+        </thead>
+        <tbody id="expenseList">
+        </tbody>
+    </table>
+    
+    <h3>Renda Total: R$ <span id="totalIncome">0.00</span></h3>
+    <h3>Despesas Totais: R$ <span id="totalExpenses">0.00</span></h3>
+    <h3>Saldo: R$ <span id="balance">0.00</span></h3>
+
+    <div class="export-section">
+        <h2>Exportar Dados</h2>
+        <button onclick="exportToXML()">Salvar como XML</button>
+        <button onclick="saveAsHTML()">Salvar como HTML</button>
+        
+        <h3>Enviar por Email</h3>
+        <input type="email" id="emailTo" placeholder="Destinatário (exemplo@email.com)" />
+        <button onclick="sendEmailLocally()">Enviar Relatório por Email</button>
+    </div>
+
+    <div class="cloud-section">
+        <h2>Google Cloud Storage</h2>
+        <p>Salve e compartilhe seu orçamento no Google Cloud Storage</p>
+        
+        <div>
+            <label for="bucketName">Nome do Bucket:</label>
+            <input type="text" id="bucketName" placeholder="nome-do-seu-bucket" />
+        </div>
+        
+        <div>
+            <label for="fileName">Nome do Arquivo (opcional):</label>
+            <input type="text" id="fileName" placeholder="orcamento_mensal.html" />
+        </div>
+        
+        <div>
+            <button onclick="saveToGoogleCloud()">Salvar no Google Cloud</button>
+        </div>
+        
+        <div id="cloudResult" class="cloud-result">
+            <h3>Link Público:</h3>
+            <p id="publicLink"></p>
+            <button onclick="copyLinkToClipboard()">Copiar Link</button>
+        </div>
+        
+        <p id="successMessage" class="success-message">Arquivo enviado com sucesso para o Google Cloud Storage!</p>
+        <p id="errorMessage" class="error-message">Erro ao enviar arquivo. Verifique os detalhes do bucket.</p>
+    </div>
+
+    <script>
+        // Objeto para armazenar dados de diferentes meses
+        let monthlyData = {};
+        let currentMonth = "";
+        
+        // Inicializar com o mês atual
+        function initializeMonth() {
+            const date = new Date();
+            const months = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", 
+                          "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+            const currentMonthIndex = date.getMonth();
+            currentMonth = months[currentMonthIndex];
+            
+            document.getElementById("monthSelector").value = currentMonth;
+            document.getElementById("currentYear").textContent = date.getFullYear();
+            
+            // Inicializar objeto do mês corrente se não existir
+            if (!monthlyData[currentMonth]) {
+                monthlyData[currentMonth] = {
+                    incomeList: [],
+                    expenseList: [],
+                    totalIncome: 0,
+                    totalExpenses: 0
+                };
+            }
+            
+            // Carregar dados do mês selecionado
+            loadMonthData();
+        }
+        
+        // Carregar dados de acordo com o mês selecionado
+        function loadMonthData() {
+            // Limpar tabelas
+            document.getElementById("incomeList").innerHTML = "";
+            document.getElementById("expenseList").innerHTML = "";
+            
+            const data = monthlyData[currentMonth];
+            
+            // Preencher dados de renda
+            data.incomeList.forEach((income, index) => {
+                const tableRef = document.getElementById("incomeList");
+                const newRow = tableRef.insertRow();
+                const categoryCell = newRow.insertCell(0);
+                const amountCell = newRow.insertCell(1);
+                const actionsCell = newRow.insertCell(2);
+                categoryCell.textContent = income.category;
+                amountCell.textContent = "R$ " + income.amount.toFixed(2);
+                
+                // Botões de ação
+                const editButton = document.createElement('button');
+                editButton.textContent = 'Editar';
+                editButton.onclick = function() {
+                    editIncome(index);
+                };
+                const deleteButton = document.createElement('button');
+                deleteButton.textContent = 'Deletar';
+                deleteButton.onclick = function() {
+                    deleteIncome(index);
+                };
+                actionsCell.appendChild(editButton);
+                actionsCell.appendChild(deleteButton);
+            });
+            
+            // Preencher dados de despesa
+            data.expenseList.forEach((expense, index) => {
+                const tableRef = document.getElementById("expenseList");
+                const newRow = tableRef.insertRow();
+                const categoryCell = newRow.insertCell(0);
+                const amountCell = newRow.insertCell(1);
+                const actionsCell = newRow.insertCell(2);
+                categoryCell.textContent = expense.category;
+                amountCell.textContent = "R$ " + expense.amount.toFixed(2);
+                
+                // Botões de ação
+                const editButton = document.createElement('button');
+                editButton.textContent = 'Editar';
+                editButton.onclick = function() {
+                    editExpense(index);
+                };
+                const deleteButton = document.createElement('button');
+                deleteButton.textContent = 'Deletar';
+                deleteButton.onclick = function() {
+                    deleteExpense(index);
+                };
+                actionsCell.appendChild(editButton);
+                actionsCell.appendChild(deleteButton);
+            });
+            
+            // Atualizar totais e saldo
+            document.getElementById("totalIncome").textContent = data.totalIncome.toFixed(2);
+            document.getElementById("totalExpenses").textContent = data.totalExpenses.toFixed(2);
+            calculateBalance();
+        }
+        
+        // Mudar de mês
+        function changeMonth() {
+            currentMonth = document.getElementById("monthSelector").value;
+            
+            // Inicializar objeto do mês selecionado se não existir
+            if (!monthlyData[currentMonth]) {
+                monthlyData[currentMonth] = {
+                    incomeList: [],
+                    expenseList: [],
+                    totalIncome: 0,
+                    totalExpenses: 0
+                };
+            }
+            
+            // Carregar dados do mês selecionado
+            loadMonthData();
+        }
+
+        function calculateBalance() {
+            const data = monthlyData[currentMonth];
+            const balance = data.totalIncome - data.totalExpenses;
+            const balanceElement = document.getElementById("balance");
+            balanceElement.textContent = balance.toFixed(2);
+            
+            // Adiciona classes para colorir o saldo
+            if (balance > 0) {
+                balanceElement.className = "positive";
+            } else if (balance < 0) {
+                balanceElement.className = "negative";
+            } else {
+                balanceElement.className = "";
+            }
+        }
+
+        function addExpense() {
+            const category = document.getElementById("expenseCategory").value.trim();
+            const amount = parseFloat(document.getElementById("expenseAmount").value) || 0;
+
+            if (category && amount > 0) {
+                const data = monthlyData[currentMonth];
+                data.totalExpenses += amount;
+                data.expenseList.push({ category, amount });
+                
+                // Adicionar linha à lista de despesas
+                const tableRef = document.getElementById("expenseList");
+                const newRow = tableRef.insertRow();
+                const categoryCell = newRow.insertCell(0);
+                const amountCell = newRow.insertCell(1);
+                const actionsCell = newRow.insertCell(2);
+                categoryCell.textContent = category;
+                amountCell.textContent = "R$ " + amount.toFixed(2);
+                
+                // Botões de ação
+                const editButton = document.createElement('button');
+                editButton.textContent = 'Editar';
+                editButton.onclick = function() {
+                    editExpense(newRow.rowIndex - 1);
+                };
+                const deleteButton = document.createElement('button');
+                deleteButton.textContent = 'Deletar';
+                deleteButton.onclick = function() {
+                    deleteExpense(newRow.rowIndex - 1);
+                };
+                actionsCell.appendChild(editButton);
+                actionsCell.appendChild(deleteButton);
+                
+                // Atualizar despesas totais
+                document.getElementById("totalExpenses").textContent = data.totalExpenses.toFixed(2);
+                document.getElementById("expenseCategory").value = ""; // Limpar a entrada de categoria
+                document.getElementById("expenseAmount").value = ""; // Limpar a entrada de valor
+                calculateBalance(); // Atualizar o saldo
+            } else {
+                alert("Por favor, insira tanto a categoria quanto um valor válido maior que zero.");
+            }
+        }
+
+        function addIncome() {
+            const category = document.getElementById("incomeCategory").value.trim();
+            const amount = parseFloat(document.getElementById("incomeAmount").value) || 0;
+
+            if (category && amount > 0) {
+                const data = monthlyData[currentMonth];
+                data.totalIncome += amount;
+                data.incomeList.push({ category, amount });
+                
+                // Adicionar linha à lista de rendas
+                const tableRef = document.getElementById("incomeList");
+                const newRow = tableRef.insertRow();
+                const categoryCell = newRow.insertCell(0);
+                const amountCell = newRow.insertCell(1);
+                const actionsCell = newRow.insertCell(2);
+                categoryCell.textContent = category;
+                amountCell.textContent = "R$ " + amount.toFixed(2);
+                
+                // Botões de ação
+                const editButton = document.createElement('button');
+                editButton.textContent = 'Editar';
+                editButton.onclick = function() {
+                    editIncome(newRow.rowIndex - 1);
+                };
+                const deleteButton = document.createElement('button');
+                deleteButton.textContent = 'Deletar';
+                deleteButton.onclick = function() {
+                    deleteIncome(newRow.rowIndex - 1);
+                };
+                actionsCell.appendChild(editButton);
+                actionsCell.appendChild(deleteButton);
+                
+                // Atualizar renda total
+                document.getElementById("totalIncome").textContent = data.totalIncome.toFixed(2);
+                document.getElementById("incomeCategory").value = ""; // Limpar a entrada de categoria
+                document.getElementById("incomeAmount").value = ""; // Limpar a entrada de valor
+                calculateBalance(); // Atualizar o saldo
+            } else {
+                alert("Por favor, insira tanto a categoria quanto um valor válido maior que zero.");
+            }
+        }
+
+        function editExpense(index) {
+            const data = monthlyData[currentMonth];
+            const category = prompt("Insira a nova categoria:", data.expenseList[index].category);
+            if (category === null) return; // Usuário cancelou
+            
+            const amount = parseFloat(prompt("Insira o novo valor:", data.expenseList[index].amount)) || 0;
+
+            if (category && amount > 0) {
+                data.totalExpenses -= data.expenseList[index].amount;
+                data.totalExpenses += amount;
+                data.expenseList[index].category = category;
+                data.expenseList[index].amount = amount;
+
+                // Atualizar tabela
+                const tableRef = document.getElementById("expenseList");
+                const row = tableRef.rows[index];
+                row.cells[0].textContent = category;
+                row.cells[1].textContent = "R$ " + amount.toFixed(2);
+
+                // Atualizar despesas totais
+                document.getElementById("totalExpenses").textContent = data.totalExpenses.toFixed(2);
+                calculateBalance(); // Atualizar o saldo
+            } else {
+                alert("Por favor, insira tanto a categoria quanto um valor válido maior que zero.");
+            }
+        }
+
+        function deleteExpense(index) {
+            if (confirm("Tem certeza que deseja deletar?")) {
+                const data = monthlyData[currentMonth];
+                data.totalExpenses -= data.expenseList[index].amount;
+                data.expenseList.splice(index, 1);
+
+                // Atualizar tabela
+                const tableRef = document.getElementById("expenseList");
+                tableRef.deleteRow(index);
+
+                // Atualizar despesas totais
+                document.getElementById("totalExpenses").textContent = data.totalExpenses.toFixed(2);
+                calculateBalance(); // Atualizar o saldo
+            }
+        }
+
+        function editIncome(index) {
+            const data = monthlyData[currentMonth];
+            const category = prompt("Insira a nova categoria:", data.incomeList[index].category);
+            if (category === null) return; // Usuário cancelou
+            
+            const amount = parseFloat(prompt("Insira o novo valor:", data.incomeList[index].amount)) || 0;
+
+            if (category && amount > 0) {
+                data.totalIncome -= data.incomeList[index].amount;
+                data.totalIncome += amount;
+                data.incomeList[index].category = category;
+                data.incomeList[index].amount = amount;
+
+                // Atualizar tabela
+                const tableRef = document.getElementById("incomeList");
+                const row = tableRef.rows[index];
+                row.cells[0].textContent = category;
+                row.cells[1].textContent = "R$ " + amount.toFixed(2);
+
+                // Atualizar renda total
+                document.getElementById("totalIncome").textContent = data.totalIncome.toFixed(2);
+                calculateBalance(); // Atualizar o saldo
+            } else {
+                alert("Por favor, insira tanto a categoria quanto um valor válido maior que zero.");
+            }
+        }
+
+        function deleteIncome(index) {
+            if (confirm("Tem certeza que deseja deletar?")) {
+                const data = monthlyData[currentMonth];
+                data.totalIncome -= data.incomeList[index].amount;
+                data.incomeList.splice(index, 1);
+
+                // Atualizar tabela
+                const tableRef = document.getElementById("incomeList");
+                tableRef.deleteRow(index);
+
+                // Atualizar renda total
+                document.getElementById("totalIncome").textContent = data.totalIncome.toFixed(2);
+                calculateBalance(); // Atualizar o saldo
+            }
+        }
+        
+        // Exportar dados para XML
+        function exportToXML() {
+            const data = monthlyData[currentMonth];
+            const year = document.getElementById("currentYear").textContent;
+            
+            // Criar estrutura XML
+            let xmlContent = '<?xml version="1.0" encoding="UTF-8" ?>\n';
+            xmlContent += `<orcamento mes="${currentMonth}" ano="${year}">\n`;
+            
+            // Adicionar rendas
+            xmlContent += '  <rendas>\n';
+            data.incomeList.forEach(income => {
+                xmlContent += `    <renda categoria="${income.category}" valor="${income.amount.toFixed(2)}" />\n`;
+            });
+            xmlContent += `    <totalRendas>${data.totalIncome.toFixed(2)}</totalRendas>\n`;
+            xmlContent += '  </rendas>\n';
+            
+            // Adicionar despesas
+            xmlContent += '  <despesas>\n';
+            data.expenseList.forEach(expense => {
+                xmlContent += `    <despesa categoria="${expense.category}" valor="${expense.amount.toFixed(2)}" />\n`;
+            });
+            xmlContent += `    <totalDespesas>${data.totalExpenses.toFixed(2)}</totalDespesas>\n`;
+            xmlContent += '  </despesas>\n';
+            
+            // Adicionar saldo
+            const balance = data.totalIncome - data.totalExpenses;
+            xmlContent += `  <saldo>${balance.toFixed(2)}</saldo>\n`;
+            xmlContent += '</orcamento>';
+            
+            // Criar e baixar o arquivo XML
+            const blob = new Blob([xmlContent], { type: 'application/xml' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `orcamento_${currentMonth}_${year}.xml`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+        
+        // Gerar o conteúdo HTML do relatório
+        function generateReportHTML() {
+            const year = document.getElementById("currentYear").textContent;
+            const data = monthlyData[currentMonth];
+            const balance = data.totalIncome - data.totalExpenses;
+            const balanceClass = balance >= 0 ? "positive" : "negative";
+            
+            // Criar HTML para o relatório
+            let reportHtml = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <title>Relatório de Orçamento - ${currentMonth}/${year}</title>
+                <style>
+                    body { font-family: Arial, sans-serif; margin: 20px; }
+                    h1 { color: #333; }
+                    table { border-collapse: collapse; width: 100%; margin: 20px 0; }
+                    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                    th { background-color: #f2f2f2; }
+                    .positive { color: green; font-weight: bold; }
+                    .negative { color: red; font-weight: bold; }
+                    .summary { margin-top: 20px; }
+                </style>
+            </head>
+            <body>
+                <h1>Relatório de Orçamento - ${currentMonth}/${year}</h1>
+                
+                <h2>Renda</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Categoria</th>
+                            <th>Valor</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+            
+            // Adicionar linhas de renda
+            data.incomeList.forEach(income => {
+                reportHtml += `
+                        <tr>
+                            <td>${income.category}</td>
+                            <td>R$ ${income.amount.toFixed(2)}</td>
+                        </tr>`;
+            });
+            
+            reportHtml += `
+                    </tbody>
+                </table>
+                
+                <h2>Despesas</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Categoria</th>
+                            <th>Valor</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+            
+            // Adicionar linhas de despesa
+            data.expenseList.forEach(expense => {
+                reportHtml += `
+                        <tr>
+                            <td>${expense.category}</td>
+                            <td>R$ ${expense.amount.toFixed(2)}</td>
+                        </tr>`;
+            });
+            
+            reportHtml += `
+                    </tbody>
+                </table>
+                
+                <div class="summary">
+                    <h3>Renda Total: R$ ${data.totalIncome.toFixed(2)}</h3>
+                    <h3>Despesas Totais: R$ ${data.totalExpenses.toFixed(2)}</h3>
+                    <h3>Saldo: R$ <span class="${balanceClass}">${balance.toFixed(2)}</span></h3>
+                </div>
+            </body>
+            </html>`;
+            
+            return reportHtml;
+        }
+        
+        // Salvar como HTML
+        function saveAsHTML() {
+            const year = document.getElementById("currentYear").textContent;
+            const htmlContent = generateReportHTML();
+            
+            // Criar e baixar o arquivo HTML
+            const blob = new Blob([htmlContent], { type: 'text/html' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `orcamento_${currentMonth}_${year}.html`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+        
+        // Enviar por email usando o cliente de email local
+        function sendEmailLocally() {
+            const emailTo = document.getElementById("emailTo").value.trim();
+            
+            if (!emailTo) {
+                alert("Por favor, insira um endereço de email válido.");
+                return;
+            }
+            
+            if (!validateEmail(emailTo)) {
+                alert("Por favor, insira um endereço de email válido.");
+                return;
+            }
+            
+            const emailHtml = generateReportHTML();
+            
+            // Codificar o HTML para usar na URL do mailto
+            const year = document.getElementById("currentYear").textContent;
+            const subject = `Relatório de Orçamento - ${currentMonth}/${year}`;
+            const emailBody = encodeURIComponent(emailHtml);
+            
+            // Criar link mailto e abrir o cliente de email padrão
+            const mailtoLink = `mailto:${emailTo}?subject=${encodeURIComponent(subject)}&body=${emailBody}`;
+            window.location.href = mailtoLink;
+            
+            // Também criar e baixar o arquivo HTML para o caso do corpo do email ser muito grande
+            const blob = new Blob([emailHtml], { type: 'text/html' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `relatorio_orcamento_${currentMonth}_${year}.html`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            alert("O email foi aberto no seu cliente de email padrão. Um arquivo HTML também foi baixado para o caso do corpo do email ser muito grande.");
+        }
+        
+        // Validar formato de email
+        function validateEmail(email) {
+            const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            return re.test(email);
+        }
+        
+        // Salvar no Google Cloud Storage
+        function saveToGoogleCloud() {
+            const bucketName = document.getElementById("bucketName").value.trim();
+            const year = document.getElementById("currentYear").textContent;
+            let fileName = document.getElementById("fileName").value.trim();
+            
+            if (!bucketName) {
+                alert("Por favor, insira o nome do bucket do Google Cloud Storage.");
+                return;
+            }
+            
+            // Se o nome do arquivo não for especificado, gerar um nome padrão
+            if (!fileName) {
+                fileName = `orcamento_${currentMonth}_${year}.html`;
+            }
+            
+            // Gerar o conteúdo HTML para upload
+            const htmlContent = generateReportHTML();
+            
+            // Em um ambiente real, aqui você usaria uma API para enviar o arquivo ao Google Cloud
+            // Mas como estamos simulando, vamos mostrar uma mensagem de sucesso e um link fictício
+            simulateGoogleCloudUpload(bucketName, fileName, htmlContent);
+        }
+        
+        // Simulação de upload para o Google Cloud
+        function simulateGoogleCloudUpload(bucketName, fileName, content) {
+            // Aqui você normalmente enviaria uma solicitação para o seu backend
+            // que usaria a API do Google Cloud para fazer o upload
+            
+            // Vamos simular resposta bem-sucedida após 1,5 segundos
+            setTimeout(() => {
+                // Ocultar mensagem de erro se estiver visível
+                document.getElementById("errorMessage").style.display = "none";
+                
+                // Mostrar mensagem de sucesso
+                document.getElementById("successMessage").style.display = "block";
+                
+                // Gerar URL pública simulada
+                const publicUrl = `https://storage.googleapis.com/${bucketName}/${fileName}`;
+                
+                // Mostrar resultado
+                document.getElementById("cloudResult").style.display = "block";
+                const linkElement = document.getElementById("publicLink");
+                linkElement.textContent = publicUrl;
+                linkElement.setAttribute("data-link", publicUrl);
+                linkElement.onclick = function() {
+                    window.open(publicUrl, '_blank');
+                };
+                
+                // Salvar um backup local
+                const blob = new Blob([content], { type: 'text/html' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = fileName;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                console.log("HTML enviado para o Google Cloud Storage (simulado)");
+            }, 1500);
+        }
+        
+        // Copiar o link público para a área de transferência
+        function copyLinkToClipboard() {
+            const linkElement = document.getElementById("publicLink");
+            const link = linkElement.getAttribute("data-link");
+            
+            navigator.clipboard.writeText(link).then(() => {
+                alert("Link copiado para a área de transferência!");
+            }, () => {
+                alert("Não foi possível copiar o link. Por favor, copie manualmente.");
+            });
+        }
+        
+        // Inicializar ao carregar a página
+        window.onload = function() {
+            initializeMonth();
+        }
+    </script>
+</body>
+</html>
